@@ -1,32 +1,45 @@
 #!/usr/bin/python
 # -*- coding: UTF-8 -*-
 
-# $Id: timelayer.py 110 2011-04-03 09:55:37Z volter $
+debug = False
 
+if debug:
+    from PyQt4 import uic
+
+import os
 from datetime import datetime, timedelta
 from qgis.core import *
 
 class TimeLayer:
     """Manages the properties of a managed (managable) layer."""
-    def __init__(self,layer,fromTimeAttribute,toTimeAttribute,enabled=True,timeFormat="%Y-%m-%d %H:%M:%S",offset=0):
+    def __init__(self,layer,fromTimeAttribute,toTimeAttribute,rColumnAttribute="",rPathAttribute="",enabled=True,offset=0):
         self.layer = layer
         self.fromTimeAttribute = fromTimeAttribute
         self.toTimeAttribute = toTimeAttribute
         self.timeEnabled = enabled
         self.originalSubsetString = self.layer.subsetString()
-        self.timeFormat = str(timeFormat) # cast in case timeFormat comes as a QString
         self.supportedFormats = [
              "%Y-%m-%d %H:%M:%S",
              "%Y-%m-%d %H:%M:%S.%f",
              "%Y-%m-%d %H:%M",
              "%Y-%m-%d"]
-        if timeFormat not in self.supportedFormats:
-            self.supportedFormats.append(timeFormat)
+        self.timeFormat = self.supportedFormats[0]
         self.offset = int(offset)
         try:
             self.getTimeExtents()
         except NotATimeAttributeError, e:
             raise InvalidTimeLayerError(e.value)
+
+        # Raster support initialization
+        self.rLayers = []
+        self.rPath = rPathAttribute
+        self.rColumn = rColumnAttribute
+        self.rRefreshInhibit = False
+
+        if debug:
+            # load the form
+            path = os.path.dirname(os.path.abspath(__file__))
+            self.debugDialog = uic.loadUi(os.path.join(path, "debug.ui"))
 
     def getLayer(self):
         """Get the layer associated with the current timeLayer"""
@@ -100,6 +113,15 @@ class TimeLayer:
         if not self.timeEnabled:
             self.deleteTimeRestriction()
             return
+
+        if debug:
+            self.debugDialog.msg.append("setTimeRestriction " + datetime.strftime(timePosition, self.timeFormat))
+            self.debugDialog.show()
+
+        if self.rRefreshInhibit:
+            return
+        self.rRefreshInhibit = True
+
         startTime = datetime.strftime(timePosition + timedelta(seconds=self.offset),self.timeFormat)
         endTime = datetime.strftime((timePosition + timeFrame + timedelta(seconds=self.offset)),self.timeFormat)
         #subsetString = "\"%s\" < '%s' AND \"%s\" >= '%s' " % ( self.fromTimeAttribute,endTime,self.toTimeAttribute,startTime)
@@ -109,6 +131,41 @@ class TimeLayer:
             subsetString = "%s AND \"%s\" < '%s' AND \"%s\" >= '%s' " % ( self.originalSubsetString,self.fromTimeAttribute,endTime,self.toTimeAttribute,startTime)
         self.layer.setSubsetString( subsetString )
         #QMessageBox.information(self.iface.mainWindow(),"Test Output",subsetString)
+
+        if self.rColumn != "":
+            # Update the raster layers
+            while len(self.rLayers) > 0:
+                rLayer = self.rLayers.pop()
+                if debug:
+                    self.debugDialog.msg.append("Remove " + rLayer.name())
+                    self.debugDialog.show()
+                QgsMapLayerRegistry.instance().removeMapLayer(rLayer.id())
+
+            # start data retreival: fetch geometry and all attributes for
+            # each feature
+            provider = self.layer.dataProvider()
+            rFieldID = provider.fieldNameIndex(self.rColumn)
+            provider.select(provider.attributeIndexes())
+            feature = QgsFeature()
+            while self.layer.dataProvider().nextFeature(feature):
+                fname = feature.attributeMap()[rFieldID].toString()
+                if debug:
+                    self.debugDialog.msg.append("Found " + fname)
+                    self.debugDialog.show()
+
+                rlayer = QgsRasterLayer(os.path.join(str(self.rPath), str(fname)), fname)
+                if rlayer.isValid():
+                    rlayer.setNoDataValue(0.0)
+                    # HACK - gvb
+                    rlayer.setContrastEnhancementAlgorithm("StretchToMinimumMaximum")
+                    self.rLayers.append(rlayer)
+            for rlayer in self.rLayers:
+                QgsMapLayerRegistry.instance().addMapLayer(rlayer)
+                if debug:
+                    self.debugDialog.msg.append("Add " + rlayer.name())
+                    self.debugDialog.show()
+
+        self.rRefreshInhibit = False
 
     def deleteTimeRestriction(self):
         """Restore original subset"""
@@ -127,7 +184,9 @@ class TimeLayer:
         saveString += self.toTimeAttribute + delimiter
         saveString += str(self.timeEnabled) + delimiter
         saveString += self.timeFormat + delimiter
-        saveString += str(self.offset)
+        saveString += str(self.offset) + delimiter
+        saveString += self.rColumn + delimiter
+        saveString += self.rPath
         return saveString
 
 class NotATimeAttributeError(Exception):

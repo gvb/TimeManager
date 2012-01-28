@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>614</width>
+    <width>621</width>
     <height>415</height>
    </rect>
   </property>
@@ -51,6 +51,9 @@
          <height>0</height>
         </size>
        </property>
+       <property name="columnCount">
+        <number>9</number>
+       </property>
        <column>
         <property name="text">
          <string>layer name</string>
@@ -64,6 +67,16 @@
        <column>
         <property name="text">
          <string>end (optional)</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>raster (optional)</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>dir (optional)</string>
         </property>
        </column>
        <column>

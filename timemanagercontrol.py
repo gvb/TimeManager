@@ -348,7 +348,15 @@ class TimeManagerControl(QObject):
                 except IndexError: # old versions didn't have an offset option
                     offset=0
                 try:
-                    timeLayer = TimeLayer(layer,fromTimeAttribute,toTimeAttribute,enabled=="True",timeFormat,offset) # create a new TimeLayer
+                    rColumnAttribute=l[7]
+                    rPathAttribute=l[8]
+                except IndexError: # added with raster support
+                    rColumnAttribute=""
+                    rPathAttribute=""
+                try:
+                    # create a new TimeLayer
+                    timeLayer = TimeLayer(layer,fromTimeAttribute,toTimeAttribute,rColumnAttribute,rPathAttribute,enabled=="True",offset)
+
                 except InvalidTimeLayerError, e:
                     QMessageBox.information(self.iface.mainWindow(),'Error','An error occured while trying to add layer '+layer.name()+' to TimeManager.\n'+e.value)
                     return False

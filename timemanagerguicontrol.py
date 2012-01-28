@@ -109,11 +109,19 @@ class TimeManagerGuiControl(QObject):
                 checkState=Qt.Checked
             else:
                 checkState=Qt.Unchecked
+            try:
+                rColumn = layer.rID
+            except:
+                rColumn = ""
+            try:
+                rPath = layer.rPath
+            except:
+                rPath = ""
             layerId=layer.getLayerId()
             timeFormat=layer.getTimeFormat()
             offset=layer.getOffset()
             
-            self.addRowToOptionsTable(layerName,startTime,endTime,checkState,layerId,timeFormat,offset)
+            self.addRowToOptionsTable(layerName,startTime,endTime,rColumn,rPath,checkState,layerId,timeFormat,offset)
         
         # restore animation options
         self.optionsDialog.spinBoxFrameLength.setValue(animationFrameLength)
@@ -151,7 +159,7 @@ class TimeManagerGuiControl(QObject):
         # loop through the rows in the table widget and add all layers accordingly
         for row in range(0,self.optionsDialog.tableWidget.rowCount()):
             # layer
-            layer=QgsMapLayerRegistry.instance().mapLayer(self.optionsDialog.tableWidget.item(row,4).text())
+            layer=QgsMapLayerRegistry.instance().mapLayer(self.optionsDialog.tableWidget.item(row,6).text())
             # start time
             startTimeAttribute = self.optionsDialog.tableWidget.item(row,1).text()
             # end time (optional)
@@ -159,16 +167,20 @@ class TimeManagerGuiControl(QObject):
                 endTimeAttribute = startTimeAttribute # end time equals start time for timeLayers of type timePoint
             else:
                 endTimeAttribute = self.optionsDialog.tableWidget.item(row,2).text()
-            if self.optionsDialog.tableWidget.item(row,3).checkState() == Qt.Checked:
+            # raster column (optional)
+            rColumnAttribute = self.optionsDialog.tableWidget.item(row,3).text()
+            # raster path (optional)
+            rPathAttribute = self.optionsDialog.tableWidget.item(row,4).text()
+            if self.optionsDialog.tableWidget.item(row,5).checkState() == Qt.Checked:
                 isEnabled = True
             else:
                 isEnabled = False
             # time format
-            timeFormat = self.optionsDialog.tableWidget.item(row,5).text()
+            timeFormat = self.optionsDialog.tableWidget.item(row,7).text()
             # offset
-            offset = int(self.optionsDialog.tableWidget.item(row,6).text()) # currently only seconds!
+            offset = int(self.optionsDialog.tableWidget.item(row,8).text()) # currently only seconds!
             try:
-                timeLayer = TimeLayer(layer,startTimeAttribute,endTimeAttribute,isEnabled,timeFormat,offset)
+                timeLayer = TimeLayer(layer,startTimeAttribute,endTimeAttribute,rColumnAttribute,rPathAttribute,isEnabled,offset)
             except InvalidTimeLayerError, e:
                 QMessageBox.information(self.iface.mainWindow(),'Error','An error occured while trying to add layer '+layer.name()+' to TimeManager.\n'+e.value)
                 break
@@ -240,7 +252,7 @@ class TimeManagerGuiControl(QObject):
             
         for row in range(0,self.optionsDialog.tableWidget.rowCount()):
             # layer
-            layer=self.mapLayers[self.optionsDialog.tableWidget.item(row,4).text()]
+            layer=self.mapLayers[self.optionsDialog.tableWidget.item(row,6).text()]
             layerList.append(layer)
         return layerList
 
@@ -260,23 +272,28 @@ class TimeManagerGuiControl(QObject):
         self.addLayerDialog.comboBoxStart.clear()
         self.addLayerDialog.comboBoxEnd.clear()
         self.addLayerDialog.comboBoxEnd.addItem('') # this box is optional, so we add an empty item
+        self.addLayerDialog.comboBoxRaster.clear()
+        self.addLayerDialog.comboBoxRaster.addItem('') # this box is optional, so we add an empty item
         for (k,attr) in fieldmap.iteritems():
             self.addLayerDialog.comboBoxStart.addItem(attr.name())
             self.addLayerDialog.comboBoxEnd.addItem(attr.name())
+            self.addLayerDialog.comboBoxRaster.addItem(attr.name())
 
     def addLayerToOptions(self):
         """write information from addLayerDialog to optionsDialog.tableWidget"""
         layerName = self.addLayerDialog.comboBoxLayers.currentText()
         startTime = self.addLayerDialog.comboBoxStart.currentText()
         endTime = self.addLayerDialog.comboBoxEnd.currentText()
+        rColumn = self.addLayerDialog.comboBoxRaster.currentText()
+        rPath = self.addLayerDialog.lineEditRPath.text()
         checkState = Qt.Checked
         layerId = self.layerIds[self.addLayerDialog.comboBoxLayers.currentIndex()]
         timeFormat = "%Y-%m-%d %H:%M:%S" # default
         offset = self.addLayerDialog.spinBoxOffset.value()
 
-        self.addRowToOptionsTable(layerName,startTime,endTime,checkState,layerId,timeFormat,offset)
+        self.addRowToOptionsTable(layerName,startTime,endTime,rColumn,rPath,checkState,layerId,timeFormat,offset)
 
-    def addRowToOptionsTable(self,layerName,startTime,endTime,checkState,layerId,timeFormat,offset):
+    def addRowToOptionsTable(self,layerName,startTime,endTime,rColumn,rPath,checkState,layerId,timeFormat,offset):
         """insert a new row into optionsDialog.tableWidget"""
         # insert row
         row=self.optionsDialog.tableWidget.rowCount()
@@ -295,21 +312,29 @@ class TimeManagerGuiControl(QObject):
         endItem.setText(endTime)
         self.optionsDialog.tableWidget.setItem(row,2,endItem)
 
+        rColItem = QTableWidgetItem()
+        rColItem.setText(rColumn)
+        self.optionsDialog.tableWidget.setItem(row,3,rColItem)
+
+        rPathItem = QTableWidgetItem()
+        rPathItem.setText(rPath)
+        self.optionsDialog.tableWidget.setItem(row,4,rPathItem)
+
         checkBoxItem = QTableWidgetItem()
         checkBoxItem.setCheckState(checkState)
-        self.optionsDialog.tableWidget.setItem(row,3,checkBoxItem)
+        self.optionsDialog.tableWidget.setItem(row,5,checkBoxItem)
 
         indexItem = QTableWidgetItem()
         indexItem.setText(layerId)
-        self.optionsDialog.tableWidget.setItem(row,4,indexItem)
+        self.optionsDialog.tableWidget.setItem(row,6,indexItem)
 
         timeFormatItem = QTableWidgetItem()
         timeFormatItem.setText(timeFormat)
-        self.optionsDialog.tableWidget.setItem(row,5,timeFormatItem)   
+        self.optionsDialog.tableWidget.setItem(row,7,timeFormatItem)   
     
         offsetItem = QTableWidgetItem()
         offsetItem.setText(str(offset))
-        self.optionsDialog.tableWidget.setItem(row,6,offsetItem)
+        self.optionsDialog.tableWidget.setItem(row,8,offsetItem)
 
     def updateTimeExtents(self,timeExtents):
         """update time extents showing in labels and represented by horizontalTimeSlider"""
