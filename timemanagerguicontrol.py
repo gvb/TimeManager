@@ -245,6 +245,7 @@ class TimeManagerGuiControl(QObject):
         # establish connections
         QObject.connect(self.addLayerDialog.comboBoxLayers,SIGNAL('currentIndexChanged (int)'),self.getLayerAttributes)
         QObject.connect(self.addLayerDialog.buttonBox,SIGNAL('accepted()'),self.addLayerToOptions)
+        QObject.connect(self.addLayerDialog.pushButtonRPath,SIGNAL('clicked()'),self.browseRPath)
 
     def getManagedLayers(self):
         """get list of QgsMapLayers listed in optionsDialog.tableWidget"""
@@ -292,6 +293,14 @@ class TimeManagerGuiControl(QObject):
         offset = self.addLayerDialog.spinBoxOffset.value()
 
         self.addRowToOptionsTable(layerName,startTime,endTime,rColumn,rPath,checkState,layerId,timeFormat,offset)
+
+    def browseRPath(self):
+        rPath = self.addLayerDialog.lineEditRPath.text()
+        #if rPath == "":
+        #    rPath = "/"
+        newRPath = QFileDialog.getExistingDirectory(None, "Raster Directory",
+                       rPath, QFileDialog.ShowDirsOnly);
+        self.addLayerDialog.lineEditRPath.setText(newRPath)
 
     def addRowToOptionsTable(self,layerName,startTime,endTime,rColumn,rPath,checkState,layerId,timeFormat,offset):
         """insert a new row into optionsDialog.tableWidget"""
