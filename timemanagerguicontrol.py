@@ -110,7 +110,7 @@ class TimeManagerGuiControl(QObject):
             else:
                 checkState=Qt.Unchecked
             try:
-                rColumn = layer.rID
+                rColumn = layer.rColumn
             except:
                 rColumn = ""
             try:
